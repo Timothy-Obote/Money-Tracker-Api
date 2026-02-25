@@ -12,7 +12,7 @@ class TransactionController extends Controller
     {
         $validated = $request->validate([
             'wallet_id'   => 'required|exists:wallets,id',
-            'amount'      => 'required|numeric|min:0.01',
+            'amount'      => 'required|numeric|min:0.01', // This should prevent negative
             'type'        => 'required|in:income,expense',
             'description' => 'nullable|string'
         ]);
@@ -21,17 +21,19 @@ class TransactionController extends Controller
         try {
             $wallet = Wallet::lockForUpdate()->findOrFail($validated['wallet_id']);
             $transaction = Transaction::create($validated);
+            
             if ($validated['type'] === 'income') {
                 $wallet->balance += $validated['amount'];
             } else {
                 $wallet->balance -= $validated['amount'];
             }
             $wallet->save();
+            
             DB::commit();
             return response()->json($transaction, 201);
         } catch (\Exception $e) {
             DB::rollBack();
-            return response()->json(['error' => 'Transaction failed'], 500);
+            return response()->json(['error' => 'Transaction failed: ' . $e->getMessage()], 500);
         }
     }
 }
